@@ -227,7 +227,7 @@ export default function App() {
     kontrola: ['dashboard', 'kalendar', 'people', 'bm', 'mt', 'obuke', 'komunikacija', 'ecanvasser'],
     vdv: ['dashboard', 'kalendar', 'people', 'obuke', 'ecanvasser'],
     callCentar: ['dashboard', 'kalendar', 'people', 'pending', 'obuke', 'komunikacija'],
-    logistika: ['dashboard', 'kalendar', 'people', 'mt', 'obuke', 'ecanvasser']
+    logistika: ['dashboard', 'kalendar', 'people', 'finansije', 'pending']
   };
 
   const canViewTab = (tab: AppTab) => {
@@ -2030,8 +2030,8 @@ export default function App() {
                   ? ['kontrolor','vdv','call','sefBM','mt']
                   : ['kontrolor','sefBM','mt']
               }
-              forceEvidencijaView={role === 'regionalCoordinator'}
               isColumnVisible={isColumnVisible}
+              hideTableView={role === 'regionalCoordinator'}
             />
           )}
 
