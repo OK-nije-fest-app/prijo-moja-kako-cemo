@@ -23,10 +23,11 @@ interface PendingTabProps {
   onApprove: (item: PendingPerson) => void;
   onReject: (id: string) => void;
   isReadOnly: boolean;
+  pendingActionsEnabled?: boolean;
   onAddPending?: (item: PendingPerson) => void;
 }
 
-export default function PendingTab({ pending, onApprove, onReject, isReadOnly, onAddPending }: PendingTabProps) {
+export default function PendingTab({ pending, onApprove, onReject, isReadOnly, pendingActionsEnabled = true, onAddPending }: PendingTabProps) {
   const [copied, setCopied] = useState(false);
   const signupLink = 'https://vracar.strukturnozapošljavanje.org/signup?ref=opstina';
 
@@ -132,7 +133,7 @@ export default function PendingTab({ pending, onApprove, onReject, isReadOnly, o
                     <th className="p-4">Kontakt podaci</th>
                     <th className="p-4 text-center">Dodatno</th>
                     <th className="p-4 max-w-xs">Napomene</th>
-                    {!isReadOnly && <th className="p-4 text-right">Akcije</th>}
+                    {pendingActionsEnabled && <th className="p-4 text-right">Akcije</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1e222b] text-xs">
@@ -216,19 +217,21 @@ export default function PendingTab({ pending, onApprove, onReject, isReadOnly, o
                       </td>
 
                       {/* Approve / Reject Actions */}
-                      {!isReadOnly && (
+                      {pendingActionsEnabled && (
                         <td className="p-4 text-right">
                           <div className="inline-flex gap-2">
                             <button
                               onClick={() => onReject(item.id)}
-                              className="p-1.5 bg-red-500/10 hover:bg-red-500/25 border border-red-500/20 hover:border-red-500/40 text-red-400 rounded-lg transition-colors"
+                              disabled={!pendingActionsEnabled}
+                              className={`p-1.5 ${pendingActionsEnabled ? 'bg-red-500/10 hover:bg-red-500/25 border border-red-500/20 hover:border-red-500/40 text-red-400' : 'bg-transparent border border-transparent text-gray-500'} rounded-lg transition-colors`}
                               title="Odbij prijavu"
                             >
                               <UserX className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => onApprove(item)}
-                              className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-400 rounded-lg transition-colors flex items-center gap-1 font-semibold"
+                              disabled={!pendingActionsEnabled}
+                              className={`px-3 py-1.5 ${pendingActionsEnabled ? 'bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-400' : 'bg-transparent border border-transparent text-gray-500'} rounded-lg transition-colors flex items-center gap-1 font-semibold`}
                               title="Odobri i upiši u bazu"
                             >
                               <UserCheck className="w-4 h-4" />

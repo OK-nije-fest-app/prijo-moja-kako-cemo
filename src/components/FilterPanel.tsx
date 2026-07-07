@@ -130,31 +130,7 @@ export default function FilterPanel({ filters, onChange, onClose, reoni = REONI 
           </select>
         </div>
 
-        <div>
-          <label className="block text-xs text-[#9aa3b2] mb-1.5 font-medium">Osnovni trening</label>
-          <select
-            value={getSelectBoolValue(filters.obukaOsnovna)}
-            onChange={(e) => handleBooleanChange('obukaOsnovna', e.target.value)}
-            className="w-full bg-[#1e222b] border border-[#2a2f3a] text-[#e7e9ee] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
-          >
-            <option value="">Svejedno</option>
-            <option value="da">Da</option>
-            <option value="ne">Ne</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-xs text-[#9aa3b2] mb-1.5 font-medium">Napredni trening</label>
-          <select
-            value={getSelectBoolValue(filters.obukaNapredna)}
-            onChange={(e) => handleBooleanChange('obukaNapredna', e.target.value)}
-            className="w-full bg-[#1e222b] border border-[#2a2f3a] text-[#e7e9ee] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
-          >
-            <option value="">Svejedno</option>
-            <option value="da">Da</option>
-            <option value="ne">Ne</option>
-          </select>
-        </div>
+        {/* Osnovni/Napredni trening filters removed per request */}
 
         <div>
           <label className="block text-xs text-[#9aa3b2] mb-1.5 font-medium">Poreklo</label>

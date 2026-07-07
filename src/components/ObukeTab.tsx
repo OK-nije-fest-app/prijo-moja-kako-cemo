@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Obuka, Person, UcesnikObuke } from '../types';
 import { GraduationCap, Plus, Calendar, Check, X, Search, Table, SlidersHorizontal, BookOpen, Trash2 } from 'lucide-react';
 
@@ -9,9 +9,12 @@ interface ObukeTabProps {
   onDeleteObuka: (obukaId: string) => void;
   onUpdateAttendance: (obukaId: string, pid: string, status: 'pozvan' | 'prisustvovao' | 'nije prisustvovao', komentar?: string) => void;
   isReadOnly: boolean;
+  allowScheduleObuka?: boolean;
+  trainingTypes?: ('kontrolor' | 'vdv' | 'call' | 'sefBM' | 'mt')[];
+  isColumnVisible?: (key: string) => boolean;
 }
 
-export default function ObukeTab({ obuke, people, onAddObuka, onDeleteObuka, onUpdateAttendance, isReadOnly }: ObukeTabProps) {
+export default function ObukeTab({ obuke, people, onAddObuka, onDeleteObuka, onUpdateAttendance, isReadOnly, allowScheduleObuka = false, trainingTypes = ['kontrolor','vdv','call'], isColumnVisible = () => true }: ObukeTabProps) {
   // Navigation sub-tabs
   const [viewMode, setViewMode] = useState<'tabela' | 'evidencija'>('tabela');
   
@@ -70,12 +73,14 @@ export default function ObukeTab({ obuke, people, onAddObuka, onDeleteObuka, onU
   };
 
   // Helper to extract training status for a person
-  const getTrainingStatus = (pid: string, type: 'kontrolor' | 'vdv' | 'call') => {
+  const getTrainingStatus = (pid: string, type: 'kontrolor' | 'vdv' | 'call' | 'sefBM' | 'mt') => {
     const matches = obuke.filter(o => {
       const name = o.naziv.toLowerCase();
       if (type === 'kontrolor') return name.includes('kontrolor');
       if (type === 'vdv') return name.includes('vdv');
       if (type === 'call') return name.includes('call') || name.includes('kol') || name.includes('centar');
+      if (type === 'sefBM') return name.includes('sef') || name.includes('šef') || (name.includes('bm') && name.includes('šef')) || name.includes('šefove');
+      if (type === 'mt') return name.includes('mt') || name.includes('mobilni') || name.includes('mobilni tim');
       return false;
     });
 
@@ -99,7 +104,7 @@ export default function ObukeTab({ obuke, people, onAddObuka, onDeleteObuka, onU
   };
 
   // Render a dropdown inside cells for easy instant scheduling/editing
-  const renderTrainingCell = (pid: string, type: 'kontrolor' | 'vdv' | 'call') => {
+  const renderTrainingCell = (pid: string, type: 'kontrolor' | 'vdv' | 'call' | 'sefBM' | 'mt') => {
     const info = getTrainingStatus(pid, type);
 
     // Find latest scheduled training of this type
@@ -108,6 +113,8 @@ export default function ObukeTab({ obuke, people, onAddObuka, onDeleteObuka, onU
       if (type === 'kontrolor') return name.includes('kontrolor');
       if (type === 'vdv') return name.includes('vdv');
       if (type === 'call') return name.includes('call') || name.includes('kol') || name.includes('centar');
+      if (type === 'sefBM') return name.includes('sef') || name.includes('šef') || (name.includes('bm') && name.includes('šef')) || name.includes('šefove');
+      if (type === 'mt') return name.includes('mt') || name.includes('mobilni') || name.includes('mobilni tim');
       return false;
     });
 
@@ -132,6 +139,8 @@ export default function ObukeTab({ obuke, people, onAddObuka, onDeleteObuka, onU
                 let defaultNaziv = "Obuka za vdv";
                 if (type === 'kontrolor') defaultNaziv = "Obuka za kontrolore";
                 if (type === 'call') defaultNaziv = "Obuka za call centar";
+                if (type === 'sefBM') defaultNaziv = "Obuka za šefove BM";
+                if (type === 'mt') defaultNaziv = "Obuka za MT";
 
                 const todayStr = new Date().toISOString().split('T')[0];
                 const nextId = `OB-${obuke.length + 1}-${Math.floor(Math.random() * 900 + 100)}`;
@@ -186,32 +195,32 @@ export default function ObukeTab({ obuke, people, onAddObuka, onDeleteObuka, onU
       {/* Sub-tab Navigation Switcher */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-[#101318] border border-[#1e222b] rounded-2xl">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setViewMode('tabela')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
-              viewMode === 'tabela'
-                ? 'bg-blue-600/10 border border-blue-500/30 text-blue-400 font-bold'
-                : 'bg-transparent border border-transparent text-[#9aa3b2] hover:text-white'
-            }`}
-          >
-            <Table className="w-4 h-4" />
-            <span>Tabela polaznika i obuka</span>
-          </button>
-          
-          <button
-            onClick={() => setViewMode('evidencija')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
-              viewMode === 'evidencija'
-                ? 'bg-blue-600/10 border border-blue-500/30 text-blue-400 font-bold'
-                : 'bg-transparent border border-transparent text-[#9aa3b2] hover:text-white'
-            }`}
-          >
-            <BookOpen className="w-4 h-4" />
-            <span>Organizacija i evidencija obuka</span>
-          </button>
-        </div>
-
-        {!isReadOnly && (
+         {!forceEvidencijaView && (
+           <button
+             onClick={() => setViewMode('tabela')}
+             className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+               viewMode === 'tabela'
+                 ? 'bg-blue-600/10 border border-blue-500/30 text-blue-400 font-bold'
+                 : 'bg-transparent border border-transparent text-[#9aa3b2] hover:text-white'
+             }`}
+           >
+             <Table className="w-4 h-4" />
+             <span>Tabela polaznika i obuka</span>
+           </button>
+         )}
+         <button
+           onClick={() => setViewMode('evidencija')}
+           className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+             viewMode === 'evidencija'
+               ? 'bg-blue-600/10 border border-blue-500/30 text-blue-400 font-bold'
+               : 'bg-transparent border border-transparent text-[#9aa3b2] hover:text-white'
+           }`}
+         >
+           <BookOpen className="w-4 h-4" />
+           <span>Organizacija i evidencija obuka</span>
+         </button>
+       </div>
+        {allowScheduleObuka && (
           <button
             onClick={() => setIsModalOpen(true)}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-xs font-semibold text-white rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
@@ -261,15 +270,29 @@ export default function ObukeTab({ obuke, people, onAddObuka, onDeleteObuka, onU
                   <tr className="border-b border-[#1e222b] text-[#9aa3b2] bg-[#0c0e12]">
                     <th className="p-3.5 font-bold text-white">Ime i prezime</th>
                     <th className="p-3.5 font-bold text-white">Uloga</th>
-                    <th className="p-3.5 font-bold text-white">Obuka za kontrolora</th>
-                    <th className="p-3.5 font-bold text-white">Obuka za vdv</th>
-                    <th className="p-3.5 font-bold text-white">Obuka za call centar</th>
+                    {trainingTypes.includes('kontrolor') && isColumnVisible('obuka_kontrolor') && (
+                      <th className="p-3.5 font-bold text-white">Obuka za kontrolora</th>
+                    )}
+                    {trainingTypes.includes('vdv') && isColumnVisible('obuka_vdv') && (
+                      <th className="p-3.5 font-bold text-white">Obuka za vdv</th>
+                    )}
+                    {trainingTypes.includes('call') && isColumnVisible('obuka_call') && (
+                      <th className="p-3.5 font-bold text-white">Obuka za call centar</th>
+                    )}
+                    {trainingTypes.includes('sefBM') && isColumnVisible('obuka_sefBM') && (
+                      <th className="p-3.5 font-bold text-white">Obuka za šefove BM</th>
+                    )}
+                    {trainingTypes.includes('mt') && isColumnVisible('obuka_mt') && (
+                      <th className="p-3.5 font-bold text-white">Obuka za MT</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1e222b]/50">
                   {filteredPeople.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="p-12 text-center text-[#9aa3b2] italic">
+                      <td colSpan={2 + trainingTypes.reduce((acc, t) => acc + (isColumnVisible(
+                        t === 'kontrolor' ? 'obuka_kontrolor' : t === 'vdv' ? 'obuka_vdv' : t === 'call' ? 'obuka_call' : t === 'sefBM' ? 'obuka_sefBM' : 'obuka_mt'
+                      ) ? 1 : 0), 0)} className="p-12 text-center text-[#9aa3b2] italic">
                         Nema pronađenih polaznika za upisani kriterijum.
                       </td>
                     </tr>
@@ -292,9 +315,21 @@ export default function ObukeTab({ obuke, people, onAddObuka, onDeleteObuka, onU
                             {p.uloga || 'Bez uloge'}
                           </span>
                         </td>
-                        <td className="p-3.5">{renderTrainingCell(p.id, 'kontrolor')}</td>
-                        <td className="p-3.5">{renderTrainingCell(p.id, 'vdv')}</td>
-                        <td className="p-3.5">{renderTrainingCell(p.id, 'call')}</td>
+                        {trainingTypes.includes('kontrolor') && isColumnVisible('obuka_kontrolor') && (
+                          <td className="p-3.5">{renderTrainingCell(p.id, 'kontrolor')}</td>
+                        )}
+                        {trainingTypes.includes('vdv') && isColumnVisible('obuka_vdv') && (
+                          <td className="p-3.5">{renderTrainingCell(p.id, 'vdv')}</td>
+                        )}
+                        {trainingTypes.includes('call') && isColumnVisible('obuka_call') && (
+                          <td className="p-3.5">{renderTrainingCell(p.id, 'call')}</td>
+                        )}
+                        {trainingTypes.includes('sefBM') && isColumnVisible('obuka_sefBM') && (
+                          <td className="p-3.5">{renderTrainingCell(p.id, 'sefBM')}</td>
+                        )}
+                        {trainingTypes.includes('mt') && isColumnVisible('obuka_mt') && (
+                          <td className="p-3.5">{renderTrainingCell(p.id, 'mt')}</td>
+                        )}
                       </tr>
                     ))
                   )}
@@ -519,9 +554,14 @@ export default function ObukeTab({ obuke, people, onAddObuka, onDeleteObuka, onU
                     onChange={(e) => setNaziv(e.target.value)}
                     className="w-full px-3 py-2 text-xs bg-[#161a22] border border-[#232935] rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                   >
-                    <option value="Obuka za kontrolore">Obuka za kontrolore</option>
-                    <option value="Obuka za vdv">Obuka za vdv</option>
-                    <option value="Obuka za call centar">Obuka za call centar</option>
+                    {trainingTypes.map((t) => {
+                      if (t === 'kontrolor') return <option key={t} value="Obuka za kontrolore">Obuka za kontrolore</option>;
+                      if (t === 'vdv') return <option key={t} value="Obuka za vdv">Obuka za vdv</option>;
+                      if (t === 'call') return <option key={t} value="Obuka za call centar">Obuka za call centar</option>;
+                      if (t === 'sefBM') return <option key={t} value="Obuka za šefove BM">Obuka za šefove BM</option>;
+                      if (t === 'mt') return <option key={t} value="Obuka za MT">Obuka za MT</option>;
+                      return null;
+                    })}
                   </select>
                 </div>
 

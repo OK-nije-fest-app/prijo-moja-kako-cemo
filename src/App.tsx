@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Person, CustomField, FilterState, SortState, SortField, SortOrder, PendingPerson, BirackoMesto, MobilniTim, Obuka, Kontakt, FinansijskaStavka } from './types';
+import { AppRole, TeamSubRole, AppTab, Person, CustomField, FilterState, SortState, SortField, SortOrder, PendingPerson, BirackoMesto, MobilniTim, Obuka, Kontakt, FinansijskaStavka } from './types';
 import { 
   INITIAL_PEOPLE, 
   INITIAL_CUSTOM_FIELDS, 
@@ -84,7 +84,9 @@ import {
   Pin,
   Menu,
   ChevronDown,
-  AlertTriangle
+  AlertTriangle,
+  Moon,
+  Sun
 } from 'lucide-react';
 
 const TOUR_STEPS = [
@@ -198,8 +200,17 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // --- Core Layout/Role Switcher State ---
-  const [role, setRole] = useState<'coord' | 'team'>('coord');
-  const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  const [role, setRole] = useState<AppRole>('regionalCoordinator');
+  const [subRole, setSubRole] = useState<TeamSubRole>('kontrola');
+  const [currentTab, setCurrentTab] = useState<AppTab>('dashboard');
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const savedTheme = localStorage.getItem('koordinator-theme');
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      return savedTheme === 'dark';
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const [selectedOpstina, setSelectedOpstina] = useState<string>(() => {
     return localStorage.getItem('struktura_selected_opstina') || 'Novi Beograd';
   });
@@ -210,6 +221,30 @@ export default function App() {
     }
     const suffix = selectedOpstina.toLowerCase().replace(/\s+/g, '_');
     return `${baseKey}_${suffix}`;
+  };
+
+  const allowedTabsForTeamSubRole: Record<TeamSubRole, AppTab[]> = {
+    kontrola: ['dashboard', 'kalendar', 'people', 'bm', 'mt', 'obuke', 'komunikacija', 'ecanvasser'],
+    vdv: ['dashboard', 'kalendar', 'people', 'obuke', 'ecanvasser'],
+    callCentar: ['dashboard', 'kalendar', 'people', 'pending', 'obuke', 'komunikacija'],
+    logistika: ['dashboard', 'kalendar', 'people', 'mt', 'obuke', 'ecanvasser']
+  };
+
+  const canViewTab = (tab: AppTab) => {
+    if (tab === 'assign') return role === 'opstinskiCoordinator';
+    if (role === 'regionalCoordinator' || role === 'opstinskiCoordinator') return true;
+    return allowedTabsForTeamSubRole[subRole]?.includes(tab) ?? false;
+  };
+
+  const getDefaultTabForRole = () => {
+    if (role === 'regionalCoordinator' || role === 'opstinskiCoordinator') return 'dashboard' as AppTab;
+    return allowedTabsForTeamSubRole[subRole][0] ?? 'dashboard';
+  };
+
+  const tabLabelForRole = () => {
+    if (role === 'regionalCoordinator') return 'Regionalni koordinator';
+    if (role === 'opstinskiCoordinator') return 'Opštinski koordinator';
+    return `Član tima (${subRole === 'callCentar' ? 'Call centar' : subRole === 'vdv' ? 'VDV' : subRole === 'logistika' ? 'Logistika' : 'Kontrola'})`;
   };
 
   // --- Ljudi Screen Filtering & Sorting State ---
@@ -258,7 +293,11 @@ export default function App() {
       imePrezime: true,
       uloga: true,
       status: true,
-      faza: true,
+      obuka_kontrolor: true,
+      obuka_sefBM: true,
+      obuka_mt: true,
+      obuka_vdv: true,
+      obuka_call: true,
       bm: true,
       telefon: true,
       email: true
@@ -282,7 +321,11 @@ export default function App() {
     { key: 'imePrezime', label: 'Ime i prezime' },
     { key: 'uloga', label: 'Uloga' },
     { key: 'status', label: 'Status' },
-    { key: 'faza', label: 'Faza' },
+    { key: 'obuka_kontrolor', label: 'Obuka za kontrolora' },
+    { key: 'obuka_vdv', label: 'Obuka za vdv' },
+    { key: 'obuka_call', label: 'Obuka za call centar' },
+    { key: 'obuka_sefBM', label: 'Obuka za šefove BM' },
+    { key: 'obuka_mt', label: 'Obuka za MT' },
     { key: 'bm', label: 'Biračko mesto' },
     { key: 'telefon', label: 'Telefon' },
     { key: 'email', label: 'Email' },
@@ -319,6 +362,7 @@ export default function App() {
     const savedKontakti = localStorage.getItem(keyKontakti);
     const savedFinansije = localStorage.getItem(keyFinansije);
     const savedRole = localStorage.getItem('struktura_role');
+    const savedSubRole = localStorage.getItem('struktura_subrole');
     const savedTab = localStorage.getItem('struktura_tab');
 
     // Get customized initial data
@@ -361,8 +405,15 @@ export default function App() {
     setKontakti(savedKontakti ? JSON.parse(savedKontakti) : initKontakti);
     setFinansije(savedFinansije ? JSON.parse(savedFinansije) : initFinansije);
     
-    if (savedRole === 'team') setRole('team');
-    if (savedTab) setCurrentTab(savedTab);
+    if (savedRole === 'coord' || savedRole === 'regionalCoordinator') setRole('regionalCoordinator');
+    else if (savedRole === 'team' || savedRole === 'teamMember') setRole('teamMember');
+    else if (savedRole === 'opstinskiCoordinator') setRole('opstinskiCoordinator');
+
+    if (savedSubRole === 'vdv' || savedSubRole === 'kontrola' || savedSubRole === 'callCentar' || savedSubRole === 'logistika') {
+      setSubRole(savedSubRole as TeamSubRole);
+    }
+
+    if (savedTab && canViewTab(savedTab as AppTab)) setCurrentTab(savedTab as AppTab);
 
     // Initial state seed to localStorage if not exists
     if (!savedPeople) localStorage.setItem(keyPeople, JSON.stringify(initPeople));
@@ -461,13 +512,38 @@ export default function App() {
     localStorage.setItem(getStorageKey('struktura_custom_fields'), JSON.stringify(newList));
   };
 
-  const handleRoleChange = (newRole: 'coord' | 'team') => {
+  const handleRoleChange = (newRole: AppRole) => {
     setRole(newRole);
+    if (newRole !== 'teamMember') {
+      localStorage.removeItem('struktura_subrole');
+    }
     localStorage.setItem('struktura_role', newRole);
-    triggerToast(`Režim rada promenjen na: ${newRole === 'coord' ? 'Regionalni koordinator' : 'Član opštinskog tima'}`);
+
+    if (newRole === 'teamMember') {
+      const allowedTabs = allowedTabsForTeamSubRole[subRole] ?? [];
+      if (!allowedTabs.includes(currentTab)) {
+        const defaultTab = allowedTabs[0] ?? 'dashboard';
+        setCurrentTab(defaultTab);
+        localStorage.setItem('struktura_tab', defaultTab);
+      }
+    }
+
+    triggerToast(`Režim rada promenjen na: ${newRole === 'regionalCoordinator' ? 'Regionalni koordinator' : newRole === 'opstinskiCoordinator' ? 'Opštinski koordinator' : 'Član opštinskog tima'}`);
   };
 
-  const handleTabChange = (newTab: string) => {
+  const handleSubRoleChange = (newSubRole: TeamSubRole) => {
+    setSubRole(newSubRole);
+    localStorage.setItem('struktura_subrole', newSubRole);
+    if (!canViewTab(currentTab)) {
+      const defaultTab = getDefaultTabForRole();
+      setCurrentTab(defaultTab);
+      localStorage.setItem('struktura_tab', defaultTab);
+    }
+    triggerToast(`Podrola promenjena na: ${newSubRole === 'kontrola' ? 'Kontrola' : newSubRole === 'vdv' ? 'VDV' : newSubRole === 'callCentar' ? 'Call centar' : 'Logistika'}`);
+  };
+
+  const handleTabChange = (newTab: AppTab) => {
+    if (!canViewTab(newTab)) return;
     setCurrentTab(newTab);
     localStorage.setItem('struktura_tab', newTab);
     setIsMobileMenuOpen(false);
@@ -485,8 +561,9 @@ export default function App() {
       triggerToast(`Uspšno dodata osoba: ${savedPerson.imePrezime}`);
     }
     updatePeopleDatabase(updated);
-    setIsPersonModalOpen(false);
-    setSelectedPerson(null);
+    // Keep the person modal open after saving and select the saved person
+    setIsPersonModalOpen(true);
+    setSelectedPerson(savedPerson);
   };
 
   const handleDeletePerson = (id: string) => {
@@ -1047,10 +1124,18 @@ export default function App() {
   };
 
   // Check read-only state for current role
-  const isReadOnly = role === 'team';
+  const isReadOnly = role === 'teamMember';
+  const isAssignReadOnly = role !== 'opstinskiCoordinator';
+  const canAssignBMPerson = role === 'opstinskiCoordinator' || (role === 'teamMember' && subRole === 'kontrola');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    document.documentElement.style.colorScheme = isDarkMode ? 'dark' : 'light';
+    localStorage.setItem('koordinator-theme', isDarkMode ? 'dark' : 'light');
+  }, [isDarkMode]);
 
   return (
-    <div className="min-h-screen bg-[#090b0f] text-gray-100 flex font-sans selection:bg-blue-500/30 selection:text-white">
+    <div className={`min-h-screen flex font-sans selection:bg-blue-500/30 selection:text-white transition-colors duration-300 ${isDarkMode ? 'bg-[#090b0f] text-gray-100' : 'bg-slate-50 text-slate-900'}`}>
       
       {/* Mobile Sidebar Backdrop Overlay */}
       {isMobileMenuOpen && (
@@ -1061,30 +1146,30 @@ export default function App() {
       )}
 
       {/* 1. SIDEBAR NAVIGATION */}
-      <div className={`fixed inset-y-0 left-0 w-64 bg-[#0c0e12] border-r border-[#1e222b] flex flex-col justify-between transition-transform duration-300 md:static md:translate-x-0 ${
-        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-      } flex-shrink-0 ${tourStep !== null && tourStep !== 0 ? 'z-50' : 'z-40'}`}>
+      <div className={`fixed inset-y-0 left-0 w-64 border-r flex flex-col justify-between transition-transform duration-300 md:static md:translate-x-0 ${
+        isDarkMode ? 'bg-[#0c0e12] border-[#1e222b]' : 'bg-white border-slate-200'
+      } ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} flex-shrink-0 ${tourStep !== null && tourStep !== 0 ? 'z-50' : 'z-40'}`}>
         
         {/* Upper Sidebar Header */}
         <div className="transition-all duration-300 flex-1 flex flex-col min-h-0">
           {/* Logo Branding */}
-          <div className={`p-6 border-b border-[#1e222b] flex items-center justify-between transition-all duration-300 ${
-            tourStep !== null && tourStep !== 0 ? 'blur-[1.5px] opacity-20 pointer-events-none' : ''
-          }`}>
+          <div className={`p-6 border-b flex items-center justify-between transition-all duration-300 ${
+            isDarkMode ? 'border-[#1e222b]' : 'border-slate-200'
+          } ${tourStep !== null && tourStep !== 0 ? 'blur-[1.5px] opacity-20 pointer-events-none' : ''}`}>
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-white text-base">
                 K
               </div>
               <div>
-                <h1 className="text-sm font-extrabold text-white leading-none font-sans">KOORDINATOR</h1>
-                <p className="text-[10px] text-[#9aa3b2] mt-1 uppercase tracking-widest font-semibold">Opština {selectedOpstina}</p>
+                <h1 className={`text-sm font-extrabold leading-none font-sans ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>KOORDINATOR</h1>
+                <p className={`text-[10px] mt-1 uppercase tracking-widest font-semibold ${isDarkMode ? 'text-[#9aa3b2]' : 'text-slate-500'}`}>Opština {selectedOpstina}</p>
               </div>
             </div>
 
             {/* Mobile close button */}
             <button
               onClick={() => setIsMobileMenuOpen(false)}
-              className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 md:hidden"
+              className={`p-1 rounded-lg md:hidden ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-white/5' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}
               title="Zatvori meni"
             >
               <X className="w-4 h-4" />
@@ -1094,49 +1179,61 @@ export default function App() {
             {/* Role Switcher Widget */}
             <div 
               id="role-switcher-tour" 
-              className={`mt-5 mx-4 p-2.5 bg-[#101318] rounded-xl border transition-all duration-300 ${
-                tourStep === 1 
-                  ? 'border-blue-500 ring-2 ring-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.35)] relative z-50 bg-[#161a22] scale-[1.02]' 
+              className={`mt-5 mx-4 p-2.5 rounded-xl border transition-all duration-300 ${
+                isDarkMode ? 'bg-[#101318] border-[#1e222b]' : 'bg-slate-50 border-slate-200'
+              } ${tourStep === 1 
+                  ? `${isDarkMode ? 'border-blue-500 ring-2 ring-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.35)] relative z-50 bg-[#161a22] scale-[1.02]' : 'border-blue-500 ring-2 ring-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.35)] relative z-50 bg-white scale-[1.02]'}` 
                   : tourStep !== null && tourStep !== 0
-                    ? 'border-[#1e222b] blur-[1.5px] opacity-20 pointer-events-none'
-                    : 'border-[#1e222b]'
+                    ? `${isDarkMode ? 'border-[#1e222b] blur-[1.5px] opacity-20 pointer-events-none' : 'border-slate-200 blur-[1.5px] opacity-20 pointer-events-none'}`
+                    : ''
               }`}
             >
-              <div className="text-[9px] text-[#9aa3b2] uppercase tracking-wider font-extrabold mb-1.5 px-1">Režim pristupa</div>
+              <div className={`text-[9px] uppercase tracking-wider font-extrabold mb-1.5 px-1 ${isDarkMode ? 'text-[#9aa3b2]' : 'text-slate-500'}`}>Režim pristupa</div>
               <div className="flex flex-col gap-1.5">
                 <button
-                  onClick={() => handleRoleChange('coord')}
+                  onClick={() => handleRoleChange('regionalCoordinator')}
                   className={`w-full py-2 px-2.5 text-[11px] font-bold rounded-lg text-left transition-all flex items-center justify-between ${
-                    role === 'coord'
+                    role === 'regionalCoordinator'
                       ? 'bg-blue-600/15 border border-blue-500/30 text-blue-400 font-extrabold'
-                      : 'text-gray-400 hover:text-white hover:bg-white/2 border border-transparent'
+                      : `${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-white/2' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} border border-transparent`
                   }`}
                 >
                   <span>Regionalni koordinator</span>
-                  {role === 'coord' && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                  {role === 'regionalCoordinator' && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
                 </button>
                 <button
-                  onClick={() => handleRoleChange('team')}
+                  onClick={() => handleRoleChange('opstinskiCoordinator')}
                   className={`w-full py-2 px-2.5 text-[11px] font-bold rounded-lg text-left transition-all flex items-center justify-between ${
-                    role === 'team'
+                    role === 'opstinskiCoordinator'
+                      ? 'bg-sky-600/15 border border-sky-500/30 text-sky-400 font-extrabold'
+                      : `${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-white/2' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} border border-transparent`
+                  }`}
+                >
+                  <span>Opštinski koordinator</span>
+                  {role === 'opstinskiCoordinator' && <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />}
+                </button>
+                <button
+                  onClick={() => handleRoleChange('teamMember')}
+                  className={`w-full py-2 px-2.5 text-[11px] font-bold rounded-lg text-left transition-all flex items-center justify-between ${
+                    role === 'teamMember'
                       ? 'bg-amber-600/15 border border-amber-500/30 text-amber-400 font-extrabold'
-                      : 'text-gray-400 hover:text-white hover:bg-white/2 border border-transparent'
+                      : `${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-white/2' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} border border-transparent`
                   }`}
                 >
                   <span>Član opštinskog tima</span>
-                  {role === 'team' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
+                  {role === 'teamMember' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
                 </button>
               </div>
             </div>
 
-            {/* Active Municipality Selector for Coordinator Mode */}
-            {role === 'coord' && (
+            {/* Active Municipality Selector for Regional Coordinator only */}
+            {role === 'regionalCoordinator' && (
               <div 
-                className={`mt-4 mx-4 p-3 bg-[#101318] rounded-xl border border-[#1e222b] transition-all duration-300 ${
-                  tourStep !== null && tourStep !== 0 ? 'blur-[1.5px] opacity-20 pointer-events-none' : ''
-                }`}
+                className={`mt-4 mx-4 p-3 rounded-xl border transition-all duration-300 ${
+                  isDarkMode ? 'bg-[#101318] border-[#1e222b]' : 'bg-slate-50 border-slate-200'
+                } ${tourStep !== null && tourStep !== 0 ? 'blur-[1.5px] opacity-20 pointer-events-none' : ''}`}
               >
-                <div className="text-[9px] text-[#9aa3b2] uppercase tracking-wider font-extrabold mb-1.5 px-1 flex items-center gap-1.5">
+                <div className={`text-[9px] uppercase tracking-wider font-extrabold mb-1.5 px-1 flex items-center gap-1.5 ${isDarkMode ? 'text-[#9aa3b2]' : 'text-slate-500'}`}>
                   <MapPin className="w-3 h-3 text-blue-500" />
                   <span>Aktivna opština</span>
                 </div>
@@ -1149,7 +1246,7 @@ export default function App() {
                       localStorage.setItem('struktura_selected_opstina', val);
                       triggerToast(`Učitana baza podataka za opštinu: ${val}`);
                     }}
-                    className="w-full bg-[#161a22] hover:bg-[#1b202a] text-xs font-bold text-white rounded-lg px-2.5 py-2 border border-[#232935] cursor-pointer transition-colors focus:outline-none focus:border-blue-500 appearance-none"
+                    className={`w-full text-xs font-bold rounded-lg px-2.5 py-2 border cursor-pointer transition-colors focus:outline-none focus:border-blue-500 appearance-none ${isDarkMode ? 'bg-[#161a22] hover:bg-[#1b202a] text-white border-[#232935]' : 'bg-white hover:bg-slate-100 text-slate-900 border-slate-300'}`}
                   >
                     {OPSTINE.map((o) => (
                       <option key={o} value={o}>
@@ -1157,9 +1254,34 @@ export default function App() {
                       </option>
                     ))}
                   </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[#9aa3b2]">
+                  <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 ${isDarkMode ? 'text-[#9aa3b2]' : 'text-slate-500'}`}>
                     <ChevronDown className="w-3.5 h-3.5" />
                   </div>
+                </div>
+              </div>
+            )}
+
+            {role === 'teamMember' && (
+              <div className={`mt-4 mx-4 p-3 rounded-xl border transition-all duration-300 ${
+                isDarkMode ? 'bg-[#101318] border-[#1e222b]' : 'bg-slate-50 border-slate-200'
+              } ${tourStep !== null && tourStep !== 0 ? 'blur-[1.5px] opacity-20 pointer-events-none' : ''}`}>
+                <div className={`text-[9px] uppercase tracking-wider font-extrabold mb-1.5 px-1 ${isDarkMode ? 'text-[#9aa3b2]' : 'text-slate-500'}`}>
+                  Podrola tima
+                </div>
+                <select
+                  value={subRole}
+                  onChange={(e) => handleSubRoleChange(e.target.value as TeamSubRole)}
+                  className={`w-full text-xs font-bold rounded-lg px-2.5 py-2 border cursor-pointer transition-colors focus:outline-none focus:border-blue-500 appearance-none ${
+                    isDarkMode ? 'bg-[#161a22] hover:bg-[#1b202a] text-white border-[#232935]' : 'bg-white hover:bg-slate-100 text-slate-900 border-slate-300'
+                  }`}
+                >
+                  <option value="kontrola">Kontrola</option>
+                  <option value="vdv">VDV</option>
+                  <option value="callCentar">Call centar</option>
+                  <option value="logistika">Logistika</option>
+                </select>
+                <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 ${isDarkMode ? 'text-[#9aa3b2]' : 'text-slate-500'}`}>
+                  <ChevronDown className="w-3.5 h-3.5" />
                 </div>
               </div>
             )}
@@ -1207,41 +1329,47 @@ export default function App() {
               </button>
 
               {/* Form Pending submissions */}
-              <button
-                id="sidebar-tab-pending"
-                onClick={() => handleTabChange('pending')}
-                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('pending', 5)}`}
-              >
-                <div className="flex items-center gap-3">
-                  <ClipboardList className="w-4.5 h-4.5" />
-                  <span>Nove prijave</span>
-                </div>
-                {pending.length > 0 && (
-                  <span className="text-[9px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full">
-                    {pending.length}
-                  </span>
-                )}
-              </button>
+              {canViewTab('pending') && (
+                <button
+                  id="sidebar-tab-pending"
+                  onClick={() => handleTabChange('pending')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('pending', 5)}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <ClipboardList className="w-4.5 h-4.5" />
+                    <span>Nove prijave</span>
+                  </div>
+                  {pending.length > 0 && (
+                    <span className="text-[9px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                      {pending.length}
+                    </span>
+                  )}
+                </button>
+              )}
 
               {/* Polling Stations */}
-              <button
-                id="sidebar-tab-bm"
-                onClick={() => handleTabChange('bm')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('bm', 6)}`}
-              >
-                <MapPin className="w-4.5 h-4.5" />
-                <span>Biračka mesta (BM)</span>
-              </button>
+              {canViewTab('bm') && (
+                <button
+                  id="sidebar-tab-bm"
+                  onClick={() => handleTabChange('bm')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('bm', 6)}`}
+                >
+                  <MapPin className="w-4.5 h-4.5" />
+                  <span>Biračka mesta (BM)</span>
+                </button>
+              )}
 
               {/* Mobile Teams */}
-              <button
-                id="sidebar-tab-mt"
-                onClick={() => handleTabChange('mt')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('mt', 7)}`}
-              >
-                <Truck className="w-4.5 h-4.5" />
-                <span>Mobilni timovi (MT)</span>
-              </button>
+              {canViewTab('mt') && (
+                <button
+                  id="sidebar-tab-mt"
+                  onClick={() => handleTabChange('mt')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('mt', 7)}`}
+                >
+                  <Truck className="w-4.5 h-4.5" />
+                  <span>Mobilni timovi (MT)</span>
+                </button>
+              )}
             </div>
 
             {/* Group: OPERACIJE */}
@@ -1251,34 +1379,40 @@ export default function App() {
               }`}>Operacije & Rad</div>
               
               {/* Assignment workspace */}
-              <button
-                id="sidebar-tab-assign"
-                onClick={() => handleTabChange('assign')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('assign', 8)}`}
-              >
-                <UserCheck className="w-4.5 h-4.5" />
-                <span>Raspoređivanje</span>
-              </button>
+              {canViewTab('assign') && (
+                <button
+                  id="sidebar-tab-assign"
+                  onClick={() => handleTabChange('assign')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('assign', 8)}`}
+                >
+                  <UserCheck className="w-4.5 h-4.5" />
+                  <span>Raspoređivanje</span>
+                </button>
+              )}
 
               {/* Trainings */}
-              <button
-                id="sidebar-tab-obuke"
-                onClick={() => handleTabChange('obuke')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('obuke', 9)}`}
-              >
-                <GraduationCap className="w-4.5 h-4.5" />
-                <span>Obuke</span>
-              </button>
+              {canViewTab('obuke') && (
+                <button
+                  id="sidebar-tab-obuke"
+                  onClick={() => handleTabChange('obuke')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('obuke', 9)}`}
+                >
+                  <GraduationCap className="w-4.5 h-4.5" />
+                  <span>Obuke</span>
+                </button>
+              )}
 
               {/* Contacts log */}
-              <button
-                id="sidebar-tab-komunikacija"
-                onClick={() => handleTabChange('komunikacija')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('komunikacija', 10)}`}
-              >
-                <PhoneCall className="w-4.5 h-4.5" />
-                <span>Komunikacija</span>
-              </button>
+              {canViewTab('komunikacija') && (
+                <button
+                  id="sidebar-tab-komunikacija"
+                  onClick={() => handleTabChange('komunikacija')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('komunikacija', 10)}`}
+                >
+                  <PhoneCall className="w-4.5 h-4.5" />
+                  <span>Komunikacija</span>
+                </button>
+              )}
             </div>
 
             {/* Group: LOGISTIKA */}
@@ -1288,32 +1422,36 @@ export default function App() {
               }`}>Logistika & Teren</div>
               
               {/* Finances */}
-              <button
-                id="sidebar-tab-finansije"
-                onClick={() => handleTabChange('finansije')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('finansije', 11)}`}
-              >
-                <Coins className="w-4.5 h-4.5" />
-                <span>Finansije i Donacije</span>
-              </button>
+              {canViewTab('finansije') && (
+                <button
+                  id="sidebar-tab-finansije"
+                  onClick={() => handleTabChange('finansije')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('finansije', 11)}`}
+                >
+                  <Coins className="w-4.5 h-4.5" />
+                  <span>Finansije i Donacije</span>
+                </button>
+              )}
 
               {/* eCanvasser Terrain analytics */}
-              <button
-                id="sidebar-tab-ecanvasser"
-                onClick={() => handleTabChange('ecanvasser')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('ecanvasser', 12)}`}
-              >
-                <Map className="w-4.5 h-4.5" />
-                <span>Teren (eCanvasser)</span>
-              </button>
+              {canViewTab('ecanvasser') && (
+                <button
+                  id="sidebar-tab-ecanvasser"
+                  onClick={() => handleTabChange('ecanvasser')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${getTourOrActiveClasses('ecanvasser', 12)}`}
+                >
+                  <Map className="w-4.5 h-4.5" />
+                  <span>Teren (eCanvasser)</span>
+                </button>
+              )}
             </div>
           </nav>
         </div>
 
         {/* Lower Sidebar Settings */}
-        <div className={`p-4 border-t border-[#1e222b] relative space-y-2 transition-all duration-300 ${
-          tourStep !== null && tourStep !== 0 ? 'blur-[1.5px] opacity-20 pointer-events-none' : ''
-        }`}>
+        <div className={`p-4 border-t relative space-y-2 transition-all duration-300 ${
+          isDarkMode ? 'border-[#1e222b]' : 'border-slate-200'
+        } ${tourStep !== null && tourStep !== 0 ? 'blur-[1.5px] opacity-20 pointer-events-none' : ''}`}>
           <button
             onClick={handleResetTour}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-blue-400 hover:text-white bg-blue-600/10 hover:bg-blue-600/25 border border-blue-500/25 hover:border-blue-500/50 rounded-xl transition-all"
@@ -1322,24 +1460,35 @@ export default function App() {
             <span>Digitalni vodič 🌟</span>
           </button>
 
-          <div
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-500 rounded-xl"
+          <button
+            type="button"
+            onClick={() => setIsDarkMode((prev) => !prev)}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl transition-all ${
+              isDarkMode ? 'text-gray-300 hover:text-white hover:bg-white/5' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
           >
-            <Settings className="w-4.5 h-4.5 text-gray-600" />
+            {isDarkMode ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
+            <span>{isDarkMode ? 'Prebaci na svetli režim' : 'Prebaci na tamni režim'}</span>
+          </button>
+
+          <div
+            className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl ${isDarkMode ? 'text-gray-500' : 'text-slate-500'}`}
+          >
+            <Settings className={`w-4.5 h-4.5 ${isDarkMode ? 'text-gray-600' : 'text-slate-500'}`} />
             <span>Sistemska podešavanja</span>
           </div>
         </div>
       </div>
 
       {/* 2. MAIN APPLICATION WORKSPACE AREA */}
-      <div className={`flex-1 flex flex-col min-w-0 bg-[#090b0f] overflow-y-auto transition-all duration-300 ${
-        tourStep !== null ? 'relative z-50' : ''
-      }`}>
+      <div className={`flex-1 flex flex-col min-w-0 overflow-y-auto transition-all duration-300 ${
+        isDarkMode ? 'bg-[#090b0f]' : 'bg-slate-50'
+      } ${tourStep !== null ? 'relative z-50' : ''}`}>
         
         {/* Top Header bar with status and notifications */}
-        <header className={`px-4 md:px-8 py-4 border-b border-[#1e222b] flex items-center justify-between bg-[#0c0e12]/95 backdrop-blur-xs sticky top-0 z-30 transition-all duration-300 ${
-          tourStep !== null ? 'opacity-20 blur-[1px] pointer-events-none' : ''
-        }`}>
+        <header className={`px-4 md:px-8 py-4 border-b flex items-center justify-between backdrop-blur-xs sticky top-0 z-30 transition-all duration-300 ${
+          isDarkMode ? 'border-[#1e222b] bg-[#0c0e12]/95' : 'border-slate-200 bg-white/95'
+        } ${tourStep !== null ? 'opacity-20 blur-[1px] pointer-events-none' : ''}`}>
           <div className="flex items-center gap-3 min-w-0">
             {/* Hamburger button for mobile */}
             <button
@@ -1351,7 +1500,7 @@ export default function App() {
             </button>
 
             <div className="min-w-0">
-              <h2 className="text-sm md:text-base font-bold text-white capitalize font-sans flex items-center gap-2 truncate">
+              <h2 className={`text-sm md:text-base font-bold capitalize font-sans flex items-center gap-2 truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                 {currentTab === 'dashboard' && 'Kontrolna tabla analitike'}
                 {currentTab === 'kalendar' && 'Kalendar i Taskovi'}
                 {currentTab === 'people' && 'Spisak svih ljudi u bazi'}
@@ -1364,8 +1513,8 @@ export default function App() {
                 {currentTab === 'finansije' && 'Blagajna i Finansije'}
                 {currentTab === 'ecanvasser' && `Door-to-door analitika (${selectedOpstina})`}
               </h2>
-              <p className="text-[10px] md:text-[11px] text-[#9aa3b2] mt-0.5 truncate">
-                {currentTab === 'dashboard' && 'Glavna metrika, levak regrutacije i zastupljenost na biračkim mestima.'}
+              <p className={`text-[10px] md:text-[11px] mt-0.5 truncate ${isDarkMode ? 'text-[#9aa3b2]' : 'text-slate-500'}`}>
+                {currentTab === 'dashboard' && 'Glavna metrika i zastupljenost na biračkim mestima.'}
                 {currentTab === 'kalendar' && 'Interaktivni kalendar akcija i Notion-style planer za praćenje dnevnih zadataka.'}
                 {currentTab === 'people' && 'Uredite podatke o volonterima, kontrolorima, dodajte sopstvene kolone i koristite Excel uvoz/izvoz.'}
                 {currentTab === 'pending' && 'Pregledajte prijave građana, odobrite ih i automatski ih unesite u bazu.'}
@@ -1382,6 +1531,15 @@ export default function App() {
 
           {/* Current Mode Badge */}
           <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsDarkMode((prev) => !prev)}
+              className={`p-2 rounded-full transition-colors ${isDarkMode ? 'text-gray-300 hover:bg-white/10 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+              aria-label={isDarkMode ? 'Prebaci na svetli režim' : 'Prebaci na tamni režim'}
+              title={isDarkMode ? 'Prebaci na svetli režim' : 'Prebaci na tamni režim'}
+            >
+              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
             <span className={`text-[8px] md:text-[9px] font-extrabold uppercase tracking-widest px-2 md:px-2.5 py-1 rounded-full border ${
               isReadOnly 
                 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' 
@@ -1394,9 +1552,10 @@ export default function App() {
 
         {/* 3. ACTIVE VIEW CONTENT PORTAL */}
         <main className={`p-4 md:p-8 flex-1 transition-all duration-300 ${
-          tourStep !== null
+          isDarkMode ? 'bg-transparent' : 'bg-transparent'
+        } ${tourStep !== null
             ? TOUR_STEPS[tourStep]?.tab === currentTab
-              ? 'relative z-50 bg-[#090b0f] ring-2 ring-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.35)] rounded-2xl scale-[1.005] mx-4 md:mx-8 my-4 md:my-6 pointer-events-none select-none'
+              ? `relative z-50 ${isDarkMode ? 'bg-[#090b0f]' : 'bg-white'} ring-2 ring-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.35)] rounded-2xl scale-[1.005] mx-4 md:mx-8 my-4 md:my-6 pointer-events-none select-none`
               : 'opacity-15 blur-[1.5px] pointer-events-none select-none'
             : ''
         }`}>
@@ -1574,11 +1733,6 @@ export default function App() {
                             Status
                           </th>
                         )}
-                        {isColumnVisible('faza') && (
-                          <th className="p-3.5 font-bold text-white hover:bg-white/2 cursor-pointer" onClick={() => handleToggleSort('faza')}>
-                            Faza
-                          </th>
-                        )}
 
                         {isColumnVisible('bm') && (
                           <th className="p-3.5 font-bold text-white hover:bg-white/2 cursor-pointer text-center" onClick={() => handleToggleSort('bm')}>
@@ -1731,10 +1885,6 @@ export default function App() {
                                 </td>
                               )}
 
-                              {isColumnVisible('faza') && (
-                                <td className="p-3.5 text-[#9aa3b2] font-semibold">{p.faza || '—'}</td>
-                              )}
-
 
                               {/* BM badge */}
                               {isColumnVisible('bm') && (
@@ -1815,6 +1965,7 @@ export default function App() {
               onApprove={handleApprovePending}
               onReject={handleRejectPending}
               isReadOnly={isReadOnly}
+              pendingActionsEnabled={role !== 'regionalCoordinator' && !isReadOnly}
               onAddPending={(item) => updatePendingDatabase([...pending, item])}
             />
           )}
@@ -1826,7 +1977,10 @@ export default function App() {
               people={people}
               onAddBM={handleAddBM}
               onDeleteBM={handleDeleteBM}
+              onAssignPerson={(pid, targetId, targetRole) => handleAssign(pid, 'Kontrola izbora', targetId, targetRole)}
+              canAssignPerson={canAssignBMPerson}
               isReadOnly={isReadOnly}
+              allowAddBM={role !== 'regionalCoordinator'}
               reoni={getReoniForOpstina(selectedOpstina)}
             />
           )}
@@ -1840,6 +1994,7 @@ export default function App() {
               onAddMT={handleAddMT}
               onDeleteMT={handleDeleteMT}
               isReadOnly={isReadOnly}
+              allowAddMT={(role === 'teamMember' && subRole === 'kontrola') || !isReadOnly}
               reoni={getReoniForOpstina(selectedOpstina)}
             />
           )}
@@ -1852,7 +2007,7 @@ export default function App() {
               mt={mt}
               onAssign={handleAssign}
               onRemoveAssignment={handleRemoveAssignment}
-              isReadOnly={isReadOnly}
+              isReadOnly={isAssignReadOnly}
             />
           )}
 
@@ -1864,7 +2019,19 @@ export default function App() {
               onAddObuka={handleAddObuka}
               onDeleteObuka={handleDeleteObuka}
               onUpdateAttendance={handleUpdateAttendance}
-              isReadOnly={isReadOnly}
+              // Make Obuke non-interactive for Regionalni koordinator
+              isReadOnly={isReadOnly || role === 'regionalCoordinator'}
+              // Scheduling allowed for teamMember(kontrola) and non-regional coordinators
+              allowScheduleObuka={(((role === 'teamMember' && subRole === 'kontrola') || !isReadOnly) && role !== 'regionalCoordinator')}
+              trainingTypes={
+                role === 'teamMember' && subRole === 'kontrola'
+                  ? ['kontrolor','sefBM','mt']
+                  : role === 'opstinskiCoordinator'
+                  ? ['kontrolor','vdv','call','sefBM','mt']
+                  : ['kontrolor','sefBM','mt']
+              }
+              forceEvidencijaView={role === 'regionalCoordinator'}
+              isColumnVisible={isColumnVisible}
             />
           )}
 

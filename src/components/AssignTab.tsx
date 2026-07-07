@@ -109,7 +109,7 @@ export default function AssignTab({ people, bm, mt, onAssign, onRemoveAssignment
 
         {isReadOnly ? (
           <div className="p-6 bg-[#101318] border border-[#1e222b] rounded-2xl text-xs text-[#9aa3b2] italic text-center">
-            Nemate dozvolu za kreiranje rasporeda. Prijavite se kao Regionalni koordinator.
+            Nemate dozvolu za kreiranje rasporeda u ovom režimu rada. Prijavite se kao Opštinski koordinator.
           </div>
         ) : (
           <form onSubmit={handleAssignSubmit} className="p-6 bg-[#101318] border border-[#1e222b] rounded-2xl space-y-4">

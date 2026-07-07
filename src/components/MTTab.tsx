@@ -10,10 +10,11 @@ interface MTTabProps {
   onAddMT: (newMT: MobilniTim) => void;
   onDeleteMT: (id: string) => void;
   isReadOnly: boolean;
+  allowAddMT?: boolean;
   reoni?: string[];
 }
 
-export default function MTTab({ mt, people, bm, onAddMT, onDeleteMT, isReadOnly, reoni = REONI }: MTTabProps) {
+export default function MTTab({ mt, people, bm, onAddMT, onDeleteMT, isReadOnly, allowAddMT = true, reoni = REONI }: MTTabProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Form states
@@ -71,7 +72,7 @@ export default function MTTab({ mt, people, bm, onAddMT, onDeleteMT, isReadOnly,
       {/* Top action bar */}
       <div className="flex justify-between items-center">
         <h3 className="text-sm font-semibold text-white">Spisak mobilnih timova</h3>
-        {!isReadOnly && (
+        {(allowAddMT ?? true) && (
           <button
             onClick={() => setIsModalOpen(true)}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-xs font-semibold text-white rounded-xl transition-colors flex items-center gap-1.5 justify-center"

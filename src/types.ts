@@ -36,6 +36,21 @@ export interface SortState {
   order: SortOrder;
 }
 
+export type AppRole = 'regionalCoordinator' | 'opstinskiCoordinator' | 'teamMember';
+export type TeamSubRole = 'vdv' | 'kontrola' | 'callCentar' | 'logistika';
+export type AppTab =
+  | 'dashboard'
+  | 'kalendar'
+  | 'people'
+  | 'pending'
+  | 'bm'
+  | 'mt'
+  | 'assign'
+  | 'obuke'
+  | 'komunikacija'
+  | 'finansije'
+  | 'ecanvasser';
+
 export interface PendingPerson {
   id: string;
   ime: string;
